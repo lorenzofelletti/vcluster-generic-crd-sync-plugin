@@ -127,6 +127,7 @@ func (m *manager) Init() (*synccontext.RegisterContext, error) {
 	return m.InitWithOptions(Options{})
 }
 
+// InitWithOptions creates a new plugin context
 func (m *manager) InitWithOptions(opts Options) (*synccontext.RegisterContext, error) {
 	name := os.Getenv(PLUGIN_NAME)
 	if name == "" {

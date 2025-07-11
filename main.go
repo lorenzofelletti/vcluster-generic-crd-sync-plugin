@@ -45,6 +45,7 @@ func main() {
 		klog.Infof("Loaded configuration:\n%s", string(loadedConfig)) //dev
 
 		// TODO: efficiently sync all mapped CRDs from the host to vcluster or perhaps this should be a separate controller that will watch CRDs and sync changes
+		// NOTE(lorenzo): if clusters are short-lived that should not be a problem and we can sync all CRDs at the start only
 		for _, m := range configuration.Mappings {
 			if m.FromVirtualCluster != nil {
 				if !plugin.Scheme.Recognizes(schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind)) {

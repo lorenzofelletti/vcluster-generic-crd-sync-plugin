@@ -23,6 +23,7 @@ type CacheClient struct {
 	scheme *runtime.Scheme
 }
 
+// NewCacheClient returns a new blocking cache client or an error
 func NewCacheClient(cache cache.Cache, config *rest.Config, options client.Options, uncachedObjects ...client.Object) (client.Client, error) {
 	// create a normal manager cache client
 	cachedClient, err := defaultNewClient(cache, config, options)

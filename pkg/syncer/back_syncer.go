@@ -7,10 +7,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/go-logr/logr"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/plugin"
 	"github.com/loft-sh/vcluster/pkg/log"
 	"github.com/loft-sh/vcluster/pkg/syncer"
-	"github.com/loft-sh/vcluster/pkg/syncer/translator"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -139,16 +139,16 @@ func (b *backSyncController) Register(ctx *synccontext.RegisterContext) error {
 			client.Object,
 		]{
 			CreateFunc: func(ctx context.Context, event event.TypedCreateEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[ctrl.Request]) {
-				b.enqueueVirtual(event.Object, limitingInterface, false)
+				b.enqueueVirtual(ctx, event.Object, limitingInterface, false)
 			},
 			UpdateFunc: func(ctx context.Context, event event.TypedUpdateEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[ctrl.Request]) {
-				b.enqueueVirtual(event.ObjectNew, limitingInterface, false)
+				b.enqueueVirtual(ctx, event.ObjectNew, limitingInterface, false)
 			},
 			DeleteFunc: func(ctx context.Context, event event.TypedDeleteEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[ctrl.Request]) {
-				b.enqueueVirtual(event.Object, limitingInterface, true)
+				b.enqueueVirtual(ctx, event.Object, limitingInterface, true)
 			},
 			GenericFunc: func(ctx context.Context, event event.TypedGenericEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[ctrl.Request]) {
-				b.enqueueVirtual(event.Object, limitingInterface, false)
+				b.enqueueVirtual(ctx, event.Object, limitingInterface, false)
 			},
 		}, source.Kind[client.Object](ctx.VirtualManager.GetCache(), b.resource(), &handler.Funcs[
 			ctrl.Request,
@@ -318,7 +318,7 @@ func (b *backSyncController) syncUp(ctx *synccontext.SyncContext, pObj client.Ob
 	// inside the virtual cluster. So we will also delete it inside the host cluster as well.
 	if b.containsBackSyncNameAnnotations(pObj) {
 		ctx.Log.Infof("Delete physical %s %s/%s, since it was deleted in virtual cluster or is missing there", b.config.Kind, pObj.GetNamespace(), pObj.GetName())
-		err := ctx.PhysicalClient.Delete(ctx.Context, pObj)
+		err := ctx.HostClient.Delete(ctx.Context, pObj)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("error deleting object: %v", err)
 		}
@@ -375,8 +375,8 @@ func (b *backSyncController) translateMetadata(pObj client.Object) (client.Objec
 	// set annotations
 	annotations := newObj.GetAnnotations()
 	delete(annotations, translate.MarkerLabel)
-	delete(annotations, translator.NameAnnotation)
-	delete(annotations, translator.NamespaceAnnotation)
+	delete(annotations, translate.NameAnnotation)
+	delete(annotations, translate.NamespaceAnnotation)
 	delete(annotations, MappingsAnnotation)
 	newObj.SetAnnotations(annotations)
 
@@ -395,8 +395,8 @@ func (b *backSyncController) PhysicalToVirtual(req types.NamespacedName, pObj cl
 	if pObj != nil && b.containsBackSyncNameAnnotations(pObj) {
 		pAnnotations := pObj.GetAnnotations()
 		return types.NamespacedName{
-			Namespace: pAnnotations[translator.NamespaceAnnotation],
-			Name:      pAnnotations[translator.NameAnnotation],
+			Namespace: pAnnotations[translate.NamespaceAnnotation],
+			Name:      pAnnotations[translate.NameAnnotation],
 		}
 	}
 
@@ -457,7 +457,7 @@ func (b *backSyncController) Start(ctx context.Context, h handler.EventHandler, 
 
 func (b *backSyncController) containsBackSyncNameAnnotations(obj client.Object) bool {
 	annotations := obj.GetAnnotations()
-	return annotations != nil && annotations[translate.MarkerLabel] == b.options.Name && annotations[translator.NameAnnotation] != "" && annotations[translator.NamespaceAnnotation] != ""
+	return annotations != nil && annotations[translate.MarkerLabel] == translate.VClusterName && annotations[translate.NameAnnotation] != "" && annotations[translate.NamespaceAnnotation] != ""
 }
 
 func (b *backSyncController) removeAnnotationsFromPhysicalObject(ctx *synccontext.SyncContext, pObj client.Object) error {
@@ -487,7 +487,7 @@ func (b *backSyncController) addAnnotationsToPhysicalObject(ctx *synccontext.Syn
 	if annotations == nil {
 		annotations = map[string]string{}
 	}
-	annotations[translate.MarkerLabel] = b.options.Name
+	annotations[translate.MarkerLabel] = translate.VClusterName
 	annotations[translate.NameAnnotation] = vObj.Name
 	annotations[translate.NamespaceAnnotation] = vObj.Namespace
 	if len(mappings) > 0 {
@@ -510,7 +510,9 @@ func (b *backSyncController) addAnnotationsToPhysicalObject(ctx *synccontext.Syn
 	return ctx.HostClient.Patch(ctx.Context, pObj, patch)
 }
 
-func (b *backSyncController) enqueueVirtual(obj client.Object, q workqueue.TypedRateLimitingInterface[ctrl.Request], isDelete bool) {
+func (b *backSyncController) enqueueVirtual(ctx context.Context, obj client.Object, q workqueue.TypedRateLimitingInterface[ctrl.Request], isDelete bool) {
+	logger := logr.FromContextOrDiscard(ctx)
+
 	if obj == nil {
 		return
 	} else if b.isExcluded(obj) {
@@ -522,20 +524,20 @@ func (b *backSyncController) enqueueVirtual(obj client.Object, q workqueue.Typed
 	list.SetAPIVersion(b.config.APIVersion)
 	err := b.physicalClient.List(context.Background(), list, client.MatchingFields{IndexByVirtualName: obj.GetNamespace() + "/" + obj.GetName()})
 	if err != nil {
-		b.logger.Errorf("error listing for virtual to physical name translation: %v", err)
+		logger.Error(err, "error listing for virtual to physical name translation")
 		return
 	}
 
 	objs, err := meta.ExtractList(list)
 	if err != nil {
-		b.logger.Errorf("error extracting list for virtual to physical name translation: %v", err)
+		logger.Error(err, "error extracting list for virtual to physical name translation")
 		return
 	} else if len(objs) == 0 {
 		if !isDelete {
 			b.logger.Infof("delete virtual %s/%s because physical is missing, but virtual object exists", obj.GetNamespace(), obj.GetName())
 			err := b.virtualClient.Delete(context.Background(), obj)
 			if err != nil && !kerrors.IsNotFound(err) {
-				b.logger.Errorf("error deleting virtual object %s/%s: %v", obj.GetNamespace(), obj.GetName(), err)
+				logger.Error(err, "error deleting virtual object", "namespace", obj.GetNamespace(), "name", obj.GetName())
 				return
 			}
 		}

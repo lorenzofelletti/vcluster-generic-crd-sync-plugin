@@ -1,11 +1,11 @@
 # Build the manager binary
-FROM golang:1.18 as builder
+FROM golang:1.25 as builder
 
 ARG TARGETOS
 ARG TARGETARCH
 
 # Make sure we use go modules
-WORKDIR vcluster
+WORKDIR /vcluster
 
 # Copy the Go Modules manifests
 COPY . .

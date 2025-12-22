@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/loft-sh/log"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/namecache"
 	"github.com/loft-sh/vcluster/pkg/syncer"
 	"github.com/loft-sh/vcluster/pkg/syncer/synccontext"
+	syncertypes "github.com/loft-sh/vcluster/pkg/syncer/types"
 	"github.com/loft-sh/vcluster/pkg/util/translate"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,9 +32,8 @@ type ForceSyncConfig struct {
 	Patch  config.Patch
 }
 
-func CreateForceSyncController(ctx *synccontext.RegisterContext, GVK schema.GroupVersionKind, config []ForceSyncConfig, nameCache namecache.NameCache) (syncer.Base, error) {
+func CreateForceSyncController(ctx *synccontext.RegisterContext, GVK schema.GroupVersionKind, config []ForceSyncConfig, nameCache namecache.NameCache) (syncertypes.Base, error) {
 	return &forceSyncController{
-		log:           log.New(GVK.Kind + "-force-sync-controller"),
 		GVK:           GVK,
 		config:        config,
 		nameCache:     nameCache,
@@ -43,7 +42,6 @@ func CreateForceSyncController(ctx *synccontext.RegisterContext, GVK schema.Grou
 }
 
 type forceSyncController struct {
-	log           log.Logger
 	GVK           schema.GroupVersionKind
 	config        []ForceSyncConfig
 	nameCache     namecache.NameCache

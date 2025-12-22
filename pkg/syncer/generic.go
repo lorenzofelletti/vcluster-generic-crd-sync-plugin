@@ -3,9 +3,10 @@ package syncer
 import (
 	"context"
 	"fmt"
+
+	"github.com/loft-sh/log"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/patches"
-	"github.com/loft-sh/vcluster-sdk/log"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

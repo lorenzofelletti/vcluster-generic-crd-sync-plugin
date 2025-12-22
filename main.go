@@ -10,7 +10,7 @@ import (
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/namecache"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/syncer"
 	"github.com/loft-sh/vcluster-sdk/plugin"
-	"github.com/loft-sh/vcluster-sdk/translate"
+	"github.com/loft-sh/vcluster/pkg/util/translate"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog"
@@ -22,12 +22,9 @@ const (
 
 func main() {
 	// init plugin
-	registerCtx, err := plugin.InitWithOptions(plugin.Options{
+	registerCtx := plugin.MustInitWithOptions(plugin.Options{
 		NewClient: blockingcacheclient.NewCacheClient,
 	})
-	if err != nil {
-		klog.Fatalf("Error initializing plugin: %v", err)
-	}
 
 	c := os.Getenv(ConfigurationEnvVar)
 	if c == "" {
@@ -49,7 +46,7 @@ func main() {
 		for _, m := range configuration.Mappings {
 			if m.FromVirtualCluster != nil {
 				if !plugin.Scheme.Recognizes(schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind)) {
-					err := translate.EnsureCRDFromPhysicalCluster(registerCtx.Context, registerCtx.PhysicalManager.GetConfig(), registerCtx.VirtualManager.GetConfig(), schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind))
+					_, _, err := translate.EnsureCRDFromPhysicalCluster(registerCtx.Context, registerCtx.PhysicalManager.GetConfig(), registerCtx.VirtualManager.GetConfig(), schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind))
 					if err != nil {
 						klog.Fatalf("Error syncronizing CRD %s(%s) from the host cluster into vcluster: %v", m.FromVirtualCluster.Kind, m.FromVirtualCluster.APIVersion, err)
 					}
@@ -57,7 +54,7 @@ func main() {
 
 				for _, c := range m.FromVirtualCluster.SyncBack {
 					if !plugin.Scheme.Recognizes(schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind)) {
-						err := translate.EnsureCRDFromPhysicalCluster(registerCtx.Context, registerCtx.PhysicalManager.GetConfig(), registerCtx.VirtualManager.GetConfig(), schema.FromAPIVersionAndKind(c.APIVersion, c.Kind))
+						_, _, err := translate.EnsureCRDFromPhysicalCluster(registerCtx.Context, registerCtx.PhysicalManager.GetConfig(), registerCtx.VirtualManager.GetConfig(), schema.FromAPIVersionAndKind(c.APIVersion, c.Kind))
 						if err != nil {
 							klog.Fatalf("Error syncronizing CRD %s(%s) from the host cluster into vcluster: %v", m.FromVirtualCluster.Kind, m.FromVirtualCluster.APIVersion, err)
 						}
@@ -146,7 +143,7 @@ func main() {
 	}
 
 	// start plugin
-	err = plugin.Start()
+	err := plugin.Start()
 	if err != nil {
 		klog.Fatalf("Error starting plugin: %v", err)
 	}

@@ -12,8 +12,8 @@ import (
 
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
 	patchesregex "github.com/loft-sh/vcluster-generic-crd-plugin/pkg/patches/regex"
-	"github.com/loft-sh/vcluster-sdk/syncer/translator"
-	"github.com/loft-sh/vcluster-sdk/translate"
+	""github.com/loft-sh/vcluster/pkg/syncer"/translator"
+	"github.com/loft-sh/vcluster/pkg/util/translate"
 	yaml "gopkg.in/yaml.v3"
 	"gotest.tools/assert"
 )

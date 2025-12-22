@@ -39,17 +39,14 @@ func NewCacheClient(cache cache.Cache, config *rest.Config, options client.Optio
 
 // defaultNewClient creates the default caching client
 func defaultNewClient(cache cache.Cache, config *rest.Config, options client.Options) (client.Client, error) {
-	// Create the Client for Write operations.
-	c, err := client.New(config, options)
-	if err != nil {
-		return nil, err
+	// Configure cache options for the client
+	options.Cache = &client.CacheOptions{
+		Reader:       cache,
+		Unstructured: true,
 	}
 
-	return client.NewDelegatingClient(client.NewDelegatingClientInput{
-		CacheReader:       cache,
-		Client:            c,
-		CacheUnstructured: true,
-	})
+	// Create the Client with cache-backed reads
+	return client.New(config, options)
 }
 
 func (c *CacheClient) poll(obj runtime.Object, condition func(newObj client.Object, oldAccessor metav1.Object) (bool, error)) error {
@@ -187,7 +184,16 @@ type CacheStatusClient struct {
 	Cache *CacheClient
 }
 
-func (c *CacheStatusClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+func (c *CacheStatusClient) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+	err := c.Cache.Client.Status().Create(ctx, obj, subResource, opts...)
+	if err != nil {
+		return err
+	}
+
+	return c.Cache.blockUpdate(ctx, obj)
+}
+
+func (c *CacheStatusClient) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 	err := c.Cache.Client.Status().Update(ctx, obj, opts...)
 	if err != nil {
 		return err
@@ -196,7 +202,7 @@ func (c *CacheStatusClient) Update(ctx context.Context, obj client.Object, opts 
 	return c.Cache.blockUpdate(ctx, obj)
 }
 
-func (c *CacheStatusClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+func (c *CacheStatusClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
 	err := c.Cache.Client.Status().Patch(ctx, obj, patch, opts...)
 	if err != nil {
 		return err

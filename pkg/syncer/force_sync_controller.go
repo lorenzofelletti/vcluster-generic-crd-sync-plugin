@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/go-logr/logr"
 	"github.com/loft-sh/log"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/namecache"
@@ -92,7 +93,7 @@ func (f *forceSyncController) Register(ctx *synccontext.RegisterContext) error {
 func (f *forceSyncController) shouldSync(obj client.Object) bool {
 	for _, c := range f.config {
 		parentGVK := schema.FromAPIVersionAndKind(c.Parent.APIVersion, c.Parent.Kind)
-		nn := f.nameCache.ResolveNamePath(parentGVK, translate.PhysicalName(obj.GetName(), obj.GetNamespace()), c.Patch.Path)
+		nn := f.nameCache.ResolveNamePath(parentGVK, translate.SingleNamespaceHostName(obj.GetName(), obj.GetNamespace(), translate.VClusterName), c.Patch.Path)
 		if nn.Name != "" {
 			// if this config matches then we don't evaluate other and return
 			return true
@@ -132,6 +133,8 @@ func containsForceSyncNameAnnotation(obj client.Object) bool {
 }
 
 func (f *forceSyncController) removeAnnotationsFromVirtualObject(ctx context.Context, obj client.Object) error {
+	logger := logr.FromContextOrDiscard(ctx)
+
 	originalObject := obj.DeepCopyObject().(client.Object)
 	annotations := obj.GetAnnotations()
 	delete(annotations, ForceSyncAnnotation)
@@ -145,11 +148,13 @@ func (f *forceSyncController) removeAnnotationsFromVirtualObject(ctx context.Con
 		return nil
 	}
 
-	log.NewFromExisting(f.log.Base(), obj.GetName()).Infof("Remove %s annotation from %s", ForceSyncAnnotation, f.GVK.Kind)
+	logger.Info("Remove annotation from object", "annotation", ForceSyncAnnotation, "kind", f.GVK.Kind, "name", obj.GetName())
 	return f.virtualClient.Patch(ctx, obj, patch)
 }
 
 func (f *forceSyncController) addAnnotationsToVirtualObject(ctx context.Context, obj client.Object) error {
+	logger := logr.FromContextOrDiscard(ctx)
+
 	originalObject := obj.DeepCopyObject().(client.Object)
 	annotations := obj.GetAnnotations()
 	if annotations == nil {
@@ -166,6 +171,6 @@ func (f *forceSyncController) addAnnotationsToVirtualObject(ctx context.Context,
 		return nil
 	}
 
-	log.NewFromExisting(f.log.Base(), obj.GetName()).Infof("Add %s annotation to %s", ForceSyncAnnotation, f.GVK.Kind)
+	logger.Info("Add annotation to object", "annotation", ForceSyncAnnotation, "kind", f.GVK.Kind, "name", obj.GetName())
 	return f.virtualClient.Patch(ctx, obj, patch)
 }

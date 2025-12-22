@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/plugin"
-	"github.com/loft-sh/vcluster-sdk/syncer/translator"
 	"github.com/loft-sh/vcluster/pkg/log"
 	"github.com/loft-sh/vcluster/pkg/syncer"
+	"github.com/loft-sh/vcluster/pkg/syncer/translator"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -464,8 +464,8 @@ func (b *backSyncController) removeAnnotationsFromPhysicalObject(ctx *synccontex
 	originalObject := pObj.DeepCopyObject().(client.Object)
 	annotations := pObj.GetAnnotations()
 	delete(annotations, translate.MarkerLabel)
-	delete(annotations, translator.NameAnnotation)
-	delete(annotations, translator.NamespaceAnnotation)
+	delete(annotations, translate.NameAnnotation)
+	delete(annotations, translate.NamespaceAnnotation)
 	delete(annotations, MappingsAnnotation)
 	pObj.SetAnnotations(annotations)
 
@@ -478,7 +478,7 @@ func (b *backSyncController) removeAnnotationsFromPhysicalObject(ctx *synccontex
 	}
 
 	ctx.Log.Infof("Delete marker annotations on object")
-	return ctx.PhysicalClient.Patch(ctx.Context, pObj, patch)
+	return ctx.HostClient.Patch(ctx.Context, pObj, patch)
 }
 
 func (b *backSyncController) addAnnotationsToPhysicalObject(ctx *synccontext.SyncContext, pObj client.Object, vObj types.NamespacedName, mappings map[string]string) error {
@@ -507,7 +507,7 @@ func (b *backSyncController) addAnnotationsToPhysicalObject(ctx *synccontext.Syn
 	}
 
 	ctx.Log.Infof("Patch marker annotations on object")
-	return ctx.PhysicalClient.Patch(ctx.Context, pObj, patch)
+	return ctx.HostClient.Patch(ctx.Context, pObj, patch)
 }
 
 func (b *backSyncController) enqueueVirtual(obj client.Object, q workqueue.TypedRateLimitingInterface[ctrl.Request], isDelete bool) {

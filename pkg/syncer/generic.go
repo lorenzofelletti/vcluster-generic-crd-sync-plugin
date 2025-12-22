@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/patches"
 	"github.com/pkg/errors"
@@ -28,6 +29,8 @@ type patcher struct {
 }
 
 func (s *patcher) ApplyPatches(ctx context.Context, fromObj, toObj client.Object, patchesConfig, reversePatchesConfig []*config.Patch, translateMetadata func(vObj client.Object) (client.Object, error), nameResolver patches.NameResolver) (client.Object, error) {
+	logger := logr.FromContextOrDiscard(ctx)
+
 	translatedObject, err := translateMetadata(fromObj)
 	if err != nil {
 		return nil, errors.Wrap(err, "translate object")
@@ -54,7 +57,7 @@ func (s *patcher) ApplyPatches(ctx context.Context, fromObj, toObj client.Object
 
 		// always apply status if it's there
 		if hasAfterStatus {
-			s.log.Infof("Apply status of %s during patching", toObjCopied.GetName())
+			logger.Info("Apply status of object during patching", "name", toObjCopied.GetName())
 			err = s.toClient.Status().Patch(ctx, toObjCopied.DeepCopy(), client.Apply, client.ForceOwnership, client.FieldOwner(fieldManager))
 			if err != nil {
 				return nil, errors.Wrap(err, "apply status")
@@ -67,7 +70,7 @@ func (s *patcher) ApplyPatches(ctx context.Context, fromObj, toObj client.Object
 	}
 
 	// always apply object
-	s.log.Infof("Apply %s during patching", toObjCopied.GetName())
+	logger.Info("Apply object during patching", "name", toObjCopied.GetName())
 	outObject := toObjCopied.DeepCopy()
 	err = s.toClient.Patch(ctx, outObject, client.Apply, client.ForceOwnership, client.FieldOwner(fieldManager))
 	if err != nil {
@@ -78,6 +81,8 @@ func (s *patcher) ApplyPatches(ctx context.Context, fromObj, toObj client.Object
 }
 
 func (s *patcher) ApplyReversePatches(ctx context.Context, fromObj, otherObj client.Object, reversePatchConfig []*config.Patch, nameResolver patches.NameResolver) (controllerutil.OperationResult, error) {
+	logger := logr.FromContextOrDiscard(ctx)
+
 	originalUnstructured, err := toUnstructured(fromObj)
 	if err != nil {
 		return controllerutil.OperationResultNone, err
@@ -103,7 +108,7 @@ func (s *patcher) ApplyReversePatches(ctx context.Context, fromObj, otherObj cli
 
 		// update status
 		if (hasBeforeStatus || hasAfterStatus) && !equality.Semantic.DeepEqual(beforeStatus, afterStatus) {
-			s.log.Infof("Update status of %s during reverse patching", fromCopied.GetName())
+			logger.Info("Update status of object during reverse patching", "name", fromCopied.GetName())
 			err = s.fromClient.Status().Update(ctx, fromCopied)
 			if err != nil {
 				return controllerutil.OperationResultNone, errors.Wrap(err, "update reverse status")
@@ -122,7 +127,7 @@ func (s *patcher) ApplyReversePatches(ctx context.Context, fromObj, otherObj cli
 
 	// compare rest of the object
 	if !equality.Semantic.DeepEqual(originalUnstructured, fromCopied) {
-		s.log.Infof("Update %s during reverse patching", fromCopied.GetName())
+		logger.Info("Update object during reverse patching", "name", fromCopied.GetName())
 		err = s.fromClient.Update(ctx, fromCopied)
 		if err != nil {
 			return controllerutil.OperationResultNone, errors.Wrap(err, "update reverse")

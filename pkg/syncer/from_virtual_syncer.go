@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/loft-sh/log"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/namecache"
 	patchesregex "github.com/loft-sh/vcluster-generic-crd-plugin/pkg/patches/regex"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/plugin"
-	"github.com/loft-sh/vcluster/pkg/syncer"
 	"github.com/loft-sh/vcluster/pkg/syncer/synccontext"
 	"github.com/loft-sh/vcluster/pkg/syncer/translator"
+	syncertypes "github.com/loft-sh/vcluster/pkg/syncer/types"
 	"github.com/loft-sh/vcluster/pkg/util/translate"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func CreateFromVirtualSyncer(ctx *synccontext.RegisterContext, config *config.FromVirtualCluster, nc namecache.NameCache) (syncer.Syncer, error) {
+func CreateFromVirtualSyncer(ctx *synccontext.RegisterContext, config *config.FromVirtualCluster, nc namecache.NameCache) (syncertypes.Syncer, error) {
 	obj := &unstructured.Unstructured{}
 	obj.SetKind(config.Kind)
 	obj.SetAPIVersion(config.APIVersion)
@@ -45,24 +44,29 @@ func CreateFromVirtualSyncer(ctx *synccontext.RegisterContext, config *config.Fr
 	statusIsSubresource := true
 	// TODO: [low priority] check if config.Kind + config.APIVersion has status subresource
 
+	mapper := &virtualToHostMapper{
+		namespace:       ctx.Config.HostNamespace,
+		targetNamespace: ctx.Config.HostNamespace,
+	}
+
 	return &fromVirtualController{
-		NamespacedTranslator: translator.NewNamespacedTranslator(ctx, config.Kind+"-from-virtual-syncer", obj),
+		GenericTranslator: translator.NewGenericTranslator(ctx, config.Kind+"-from-virtual-syncer", obj, mapper),
 		patcher: &patcher{
 			fromClient:          ctx.VirtualManager.GetClient(),
-			toClient:            ctx.PhysicalManager.GetClient(),
+			toClient:            ctx.HostManager.GetClient(),
 			statusIsSubresource: statusIsSubresource,
-			log:                 log.New(config.Kind + "-from-virtual-syncer"),
 		},
 		gvk:             schema.FromAPIVersionAndKind(config.APIVersion, config.Kind),
 		config:          config,
 		nameCache:       nc,
 		selector:        selector,
-		targetNamespace: ctx.TargetNamespace,
+		targetNamespace: ctx.Config.HostNamespace,
+		mapper:          mapper,
 	}, nil
 }
 
 type fromVirtualController struct {
-	translator.NamespacedTranslator
+	syncertypes.GenericTranslator
 
 	patcher *patcher
 	gvk     schema.GroupVersionKind
@@ -71,6 +75,7 @@ type fromVirtualController struct {
 	nameCache       namecache.NameCache
 	selector        labels.Selector
 	targetNamespace string
+	mapper          *virtualToHostMapper
 }
 
 func (f *fromVirtualController) SyncDown(ctx *synccontext.SyncContext, vObj client.Object) (ctrl.Result, error) {
@@ -81,8 +86,10 @@ func (f *fromVirtualController) SyncDown(ctx *synccontext.SyncContext, vObj clie
 
 	// apply object to physical cluster
 	ctx.Log.Infof("Create physical %s %s/%s, since it is missing, but virtual object exists", f.config.Kind, vObj.GetNamespace(), vObj.GetName())
-	_, err := f.patcher.ApplyPatches(ctx.Context, vObj, nil, f.config.Patches, f.config.ReversePatches, func(vObj client.Object) (client.Object, error) {
-		return f.TranslateMetadata(vObj), nil
+	pName := f.mapper.VirtualToHost(ctx, types.NamespacedName{Name: vObj.GetName(), Namespace: vObj.GetNamespace()}, vObj)
+	pObj := translate.HostMetadata(vObj, pName)
+	_, err := f.patcher.ApplyPatches(ctx.Context, vObj, pObj, f.config.Patches, f.config.ReversePatches, func(vObj client.Object) (client.Object, error) {
+		return pObj, nil
 	}, &virtualToHostNameResolver{namespace: vObj.GetNamespace(), targetNamespace: f.targetNamespace})
 	if err != nil {
 		f.EventRecorder().Eventf(vObj, "Warning", "SyncError", "Error syncing to physical cluster: %v", err)
@@ -96,12 +103,26 @@ func (f *fromVirtualController) isExcluded(pObj client.Object) bool {
 	return labels == nil || labels[controlledByLabel] != f.getControllerID()
 }
 
-func (f *fromVirtualController) Sync(ctx *synccontext.SyncContext, pObj client.Object, vObj client.Object) (ctrl.Result, error) {
+// Implement Syncer interface
+func (f *fromVirtualController) Syncer() syncertypes.Sync[client.Object] {
+	return f
+}
+
+// SyncToHost is called when a virtual object was created and needs to be synced down to the physical cluster
+func (f *fromVirtualController) SyncToHost(ctx *synccontext.SyncContext, event *synccontext.SyncToHostEvent[client.Object]) (ctrl.Result, error) {
+	return f.SyncDown(ctx, event.Virtual)
+}
+
+// Sync is called to sync a virtual object with a physical object
+func (f *fromVirtualController) Sync(ctx *synccontext.SyncContext, event *synccontext.SyncEvent[client.Object]) (ctrl.Result, error) {
+	vObj := event.Virtual
+	pObj := event.Host
+
 	if isControlled(vObj) || f.isExcluded(pObj) {
 		return ctrl.Result{}, nil
 	} else if !f.objectMatches(vObj) {
 		ctx.Log.Infof("delete physical %s %s/%s, because it is not used anymore", f.config.Kind, pObj.GetNamespace(), pObj.GetName())
-		err := ctx.PhysicalClient.Delete(ctx.Context, pObj)
+		err := ctx.HostClient.Delete(ctx, pObj)
 		if err != nil {
 			ctx.Log.Infof("error deleting physical %s %s/%s in physical cluster: %v", f.config.Kind, pObj.GetNamespace(), pObj.GetName(), err)
 			return ctrl.Result{}, err
@@ -129,8 +150,10 @@ func (f *fromVirtualController) Sync(ctx *synccontext.SyncContext, pObj client.O
 	}
 
 	// apply patches
-	_, err = f.patcher.ApplyPatches(ctx.Context, vObj, pObj, f.config.Patches, f.config.ReversePatches, func(vObj client.Object) (client.Object, error) {
-		return f.TranslateMetadata(vObj), nil
+	pName := f.mapper.VirtualToHost(ctx, types.NamespacedName{Name: vObj.GetName(), Namespace: vObj.GetNamespace()}, vObj)
+	updatedPObj := translate.HostMetadata(vObj, pName)
+	_, err = f.patcher.ApplyPatches(ctx.Context, vObj, updatedPObj, f.config.Patches, f.config.ReversePatches, func(vObj client.Object) (client.Object, error) {
+		return updatedPObj, nil
 	}, &virtualToHostNameResolver{namespace: vObj.GetNamespace(), targetNamespace: f.targetNamespace})
 	if err != nil {
 		if kerrors.IsInvalid(err) {
@@ -147,15 +170,25 @@ func (f *fromVirtualController) Sync(ctx *synccontext.SyncContext, pObj client.O
 	return ctrl.Result{}, nil
 }
 
-var _ syncer.UpSyncer = &fromVirtualController{}
-
-func (f *fromVirtualController) SyncUp(ctx *synccontext.SyncContext, pObj client.Object) (ctrl.Result, error) {
-	if !translate.IsManaged(pObj) || f.isExcluded(pObj) {
+func (f *fromVirtualController) SyncToVirtual(ctx *synccontext.SyncContext, event *synccontext.SyncToVirtualEvent[client.Object]) (ctrl.Result, error) {
+	isManaged, err := f.mapper.IsManaged(ctx, event.Host)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if !isManaged || f.isExcluded(event.Host) {
 		return ctrl.Result{}, nil
 	}
 
 	// delete physical object because virtual one is missing
-	return syncer.DeleteObject(ctx, pObj)
+	err = ctx.HostClient.Delete(ctx, event.Host)
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{}, nil
 }
 
 func (f *fromVirtualController) getControllerID() string {
@@ -163,26 +196,6 @@ func (f *fromVirtualController) getControllerID() string {
 		return f.config.ID
 	}
 	return plugin.GetPluginName()
-}
-
-// TranslateMetadata converts the virtual object into a physical object
-func (f *fromVirtualController) TranslateMetadata(vObj client.Object) client.Object {
-	pObj := f.NamespacedTranslator.TranslateMetadata(vObj)
-	labels := pObj.GetLabels()
-	if labels == nil {
-		labels = map[string]string{}
-	}
-	labels[controlledByLabel] = f.getControllerID()
-	pObj.SetLabels(labels)
-	return pObj
-}
-
-func (f *fromVirtualController) IsManaged(pObj client.Object) (bool, error) {
-	if !translate.IsManaged(pObj) {
-		return false, nil
-	}
-
-	return !f.isExcluded(pObj), nil
 }
 
 func isControlled(obj client.Object) bool {
@@ -209,10 +222,10 @@ func (r *virtualToHostNameResolver) TranslateNameWithNamespace(name string, name
 			if ns == "" {
 				ns = namespace
 			}
-			return types.NamespacedName{Namespace: r.targetNamespace, Name: translate.PhysicalName(name, ns)}
+			return types.NamespacedName{Namespace: r.targetNamespace, Name: translate.SingleNamespaceHostName(name, ns, translate.VClusterName)}
 		}), nil
 	} else {
-		return translate.PhysicalName(name, namespace), nil
+		return translate.SingleNamespaceHostName(name, namespace, translate.VClusterName), nil
 	}
 }
 
@@ -221,13 +234,13 @@ func (r *virtualToHostNameResolver) TranslateLabelExpressionsSelector(selector *
 	if selector != nil {
 		s = &metav1.LabelSelector{MatchLabels: map[string]string{}}
 		for k, v := range selector.MatchLabels {
-			s.MatchLabels[translator.ConvertLabelKey(k)] = v
+			s.MatchLabels[translate.HostLabelNamespace(k)] = v
 		}
 		if len(selector.MatchExpressions) > 0 {
 			s.MatchExpressions = []metav1.LabelSelectorRequirement{}
 			for i, r := range selector.MatchExpressions {
 				s.MatchExpressions[i] = metav1.LabelSelectorRequirement{
-					Key:      translator.ConvertLabelKey(r.Key),
+					Key:      translate.HostLabelNamespace(r.Key),
 					Operator: r.Operator,
 					Values:   r.Values,
 				}
@@ -240,14 +253,14 @@ func (r *virtualToHostNameResolver) TranslateLabelExpressionsSelector(selector *
 }
 
 func (r *virtualToHostNameResolver) TranslateLabelKey(key string) (string, error) {
-	return translator.ConvertLabelKey(key), nil
+	return translate.HostLabelNamespace(key), nil
 }
 
 func (r *virtualToHostNameResolver) TranslateLabelSelector(selector map[string]string) (map[string]string, error) {
 	s := map[string]string{}
 	if selector != nil {
 		for k, v := range selector {
-			s[translator.ConvertLabelKey(k)] = v
+			s[translate.HostLabelNamespace(k)] = v
 		}
 		s[translate.NamespaceLabel] = r.namespace
 		s[translate.MarkerLabel] = translate.VClusterName
@@ -315,4 +328,34 @@ func validateFromVirtualConfig(config *config.FromVirtualCluster) error {
 		}
 	}
 	return nil
+}
+
+// virtualToHostMapper implements the Mapper interface
+type virtualToHostMapper struct {
+	namespace       string
+	targetNamespace string
+}
+
+func (m *virtualToHostMapper) Migrate(_ *synccontext.RegisterContext, _ synccontext.Mapper) error {
+	return nil
+}
+
+func (m *virtualToHostMapper) GroupVersionKind() schema.GroupVersionKind {
+	return schema.GroupVersionKind{}
+}
+
+func (m *virtualToHostMapper) VirtualToHost(ctx *synccontext.SyncContext, req types.NamespacedName, vObj client.Object) types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: m.targetNamespace,
+		Name:      translate.SingleNamespaceHostName(req.Name, req.Namespace, translate.VClusterName),
+	}
+}
+
+func (m *virtualToHostMapper) HostToVirtual(_ *synccontext.SyncContext, req types.NamespacedName, _ client.Object) types.NamespacedName {
+	return types.NamespacedName{}
+}
+
+func (m *virtualToHostMapper) IsManaged(ctx *synccontext.SyncContext, pObj client.Object) (bool, error) {
+	// check if the object has the managed-by label
+	return pObj.GetLabels() != nil && pObj.GetLabels()[translate.MarkerLabel] == translate.VClusterName, nil
 }

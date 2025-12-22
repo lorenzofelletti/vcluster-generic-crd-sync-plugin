@@ -12,7 +12,6 @@ import (
 
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
 	patchesregex "github.com/loft-sh/vcluster-generic-crd-plugin/pkg/patches/regex"
-	"github.com/loft-sh/vcluster/pkg/syncer/translator"
 	"github.com/loft-sh/vcluster/pkg/util/translate"
 	yaml "gopkg.in/yaml.v3"
 	"gotest.tools/assert"
@@ -495,15 +494,15 @@ func (r *fakeVirtualToHostNameResolver) TranslateNameWithNamespace(name string, 
 			if ns == "" {
 				ns = namespace
 			}
-			return types.NamespacedName{Namespace: r.targetNamespace, Name: translate.PhysicalName(name, ns)}
+			return types.NamespacedName{Namespace: r.targetNamespace, Name: translate.SingleNamespaceHostName(name, ns, translate.VClusterName)}
 		}), nil
 	} else {
-		return translate.PhysicalName(name, namespace), nil
+		return translate.SingleNamespaceHostName(name, namespace, translate.VClusterName), nil
 	}
 }
 
 func (r *fakeVirtualToHostNameResolver) TranslateLabelKey(key string) (string, error) {
-	return translator.ConvertLabelKey(key), nil
+	return translate.HostLabelNamespace(key), nil
 }
 
 func (r *fakeVirtualToHostNameResolver) TranslateLabelExpressionsSelector(selector *metav1.LabelSelector) (*metav1.LabelSelector, error) {

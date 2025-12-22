@@ -61,7 +61,7 @@ func (c *fromVirtualClusterCacheHandler) mappingsFromVirtualObject(obj *unstruct
 	mappings[IndexPhysicalToVirtualNamePath] = map[string]string{}
 
 	// add metadata.name mapping
-	addSingleMapping(mappings, obj.GetNamespace()+"/"+obj.GetName(), translate.PhysicalName(obj.GetName(), obj.GetNamespace()), MetadataFieldPath)
+	addSingleMapping(mappings, obj.GetNamespace()+"/"+obj.GetName(), translate.SingleNamespaceHostName(obj.GetName(), obj.GetNamespace(), translate.VClusterName), MetadataFieldPath)
 
 	// TODO add explicit name caches?
 	for _, p := range mappingConfig.Patches {
@@ -93,13 +93,13 @@ func (c *fromVirtualClusterCacheHandler) mappingsFromVirtualObject(obj *unstruct
 						if namespace == "" {
 							namespace = obj.GetNamespace()
 						}
-						addSingleMapping(mappings, namespace+"/"+name, translate.PhysicalName(name, namespace), p.Path)
+						addSingleMapping(mappings, namespace+"/"+name, translate.SingleNamespaceHostName(name, namespace, translate.VClusterName), p.Path)
 
 						// return empty as return value will not be used, we only want to add the mappings above
 						return types.NamespacedName{}
 					})
 				} else {
-					addSingleMapping(mappings, obj.GetNamespace()+"/"+m.Value, translate.PhysicalName(m.Value, obj.GetNamespace()), p.Path)
+					addSingleMapping(mappings, obj.GetNamespace()+"/"+m.Value, translate.SingleNamespaceHostName(m.Value, obj.GetNamespace(), translate.VClusterName), p.Path)
 				}
 			}
 		}

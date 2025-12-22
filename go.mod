@@ -4,13 +4,14 @@ go 1.25
 
 require (
 	github.com/ghodss/yaml v1.0.0
+	github.com/go-logr/logr v1.4.3
 	github.com/loft-sh/log v0.0.0-20240219160058-26d83ffb46ac
 	github.com/loft-sh/vcluster v0.30.4
 	github.com/loft-sh/vcluster-sdk v0.6.6
 	github.com/pkg/errors v0.9.1
 	github.com/vmware-labs/yaml-jsonpath v0.3.2
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.34.0
+	gotest.tools v2.2.0+incompatible
 	k8s.io/apimachinery v0.34.0
 	k8s.io/client-go v0.34.0
 	k8s.io/klog v1.0.0
@@ -79,7 +80,6 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
-	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
@@ -204,6 +204,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	k8s.io/api v0.34.0 // indirect
 	k8s.io/apiextensions-apiserver v0.34.0 // indirect
 	k8s.io/apiserver v0.34.0 // indirect
 	k8s.io/cli-runtime v0.34.0 // indirect

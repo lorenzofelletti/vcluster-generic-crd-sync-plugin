@@ -234,7 +234,7 @@ func (r *virtualToHostNameResolver) TranslateLabelExpressionsSelector(selector *
 			}
 		}
 		s.MatchLabels[translate.NamespaceLabel] = r.namespace
-		s.MatchLabels[translate.MarkerLabel] = translate.Suffix
+		s.MatchLabels[translate.MarkerLabel] = translate.VClusterName
 	}
 	return s, nil
 }
@@ -250,7 +250,7 @@ func (r *virtualToHostNameResolver) TranslateLabelSelector(selector map[string]s
 			s[translator.ConvertLabelKey(k)] = v
 		}
 		s[translate.NamespaceLabel] = r.namespace
-		s[translate.MarkerLabel] = translate.Suffix
+		s[translate.MarkerLabel] = translate.VClusterName
 	}
 	return s, nil
 }

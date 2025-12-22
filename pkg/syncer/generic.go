@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/loft-sh/log"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/patches"
 	"github.com/pkg/errors"
@@ -26,7 +25,6 @@ type patcher struct {
 	toClient   client.Client
 
 	statusIsSubresource bool
-	log                 log.Logger
 }
 
 func (s *patcher) ApplyPatches(ctx context.Context, fromObj, toObj client.Object, patchesConfig, reversePatchesConfig []*config.Patch, translateMetadata func(vObj client.Object) (client.Object, error), nameResolver patches.NameResolver) (client.Object, error) {

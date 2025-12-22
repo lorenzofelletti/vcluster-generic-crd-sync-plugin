@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 
-	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/blockingcacheclient"
 	"gopkg.in/yaml.v3"
 
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
@@ -11,7 +10,6 @@ import (
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/syncer"
 	"github.com/loft-sh/vcluster-sdk/plugin"
 	"github.com/loft-sh/vcluster/pkg/util/translate"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog"
 )
@@ -23,7 +21,7 @@ const (
 func main() {
 	// init plugin
 	registerCtx := plugin.MustInitWithOptions(plugin.Options{
-		NewClient: blockingcacheclient.NewCacheClient,
+		// NewClient: blockingcacheclient.NewCacheClient,
 	})
 
 	c := os.Getenv(ConfigurationEnvVar)
@@ -45,20 +43,20 @@ func main() {
 		// NOTE(lorenzo): if clusters are short-lived that should not be a problem and we can sync all CRDs at the start only
 		for _, m := range configuration.Mappings {
 			if m.FromVirtualCluster != nil {
-				if !plugin.Scheme.Recognizes(schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind)) {
-					_, _, err := translate.EnsureCRDFromPhysicalCluster(registerCtx.Context, registerCtx.PhysicalManager.GetConfig(), registerCtx.VirtualManager.GetConfig(), schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind))
+				// if !plugin.Scheme.Recognizes(schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind)) {
+				_, _, err := translate.EnsureCRDFromPhysicalCluster(registerCtx.Context, registerCtx.HostManager.GetConfig(), registerCtx.VirtualManager.GetConfig(), schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind))
+				if err != nil {
+					klog.Fatalf("Error syncronizing CRD %s(%s) from the host cluster into vcluster: %v", m.FromVirtualCluster.Kind, m.FromVirtualCluster.APIVersion, err)
+				}
+				// }
+
+				for _, c := range m.FromVirtualCluster.SyncBack {
+					// if !plugin.Scheme.Recognizes(schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind)) {
+					_, _, err := translate.EnsureCRDFromPhysicalCluster(registerCtx.Context, registerCtx.HostManager.GetConfig(), registerCtx.VirtualManager.GetConfig(), schema.FromAPIVersionAndKind(c.APIVersion, c.Kind))
 					if err != nil {
 						klog.Fatalf("Error syncronizing CRD %s(%s) from the host cluster into vcluster: %v", m.FromVirtualCluster.Kind, m.FromVirtualCluster.APIVersion, err)
 					}
-				}
-
-				for _, c := range m.FromVirtualCluster.SyncBack {
-					if !plugin.Scheme.Recognizes(schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind)) {
-						_, _, err := translate.EnsureCRDFromPhysicalCluster(registerCtx.Context, registerCtx.PhysicalManager.GetConfig(), registerCtx.VirtualManager.GetConfig(), schema.FromAPIVersionAndKind(c.APIVersion, c.Kind))
-						if err != nil {
-							klog.Fatalf("Error syncronizing CRD %s(%s) from the host cluster into vcluster: %v", m.FromVirtualCluster.Kind, m.FromVirtualCluster.APIVersion, err)
-						}
-					}
+					// }
 				}
 			}
 		}
@@ -114,32 +112,32 @@ func main() {
 			}
 		}
 
-		if len(forceSyncSecrets) > 0 {
-			if containsStr(registerCtx.Options.Controllers, "-secrets") {
-				klog.Fatalf("The Secret sync is being used in the configuration, but vcluster Secret syncer is disabled.")
-			}
-			s, err := syncer.CreateForceSyncController(registerCtx, corev1.SchemeGroupVersion.WithKind("Secret"), forceSyncSecrets, nc)
-			if err != nil {
-				klog.Fatalf("Error creating Secret ForceSyncController : %v", err)
-			}
-			err = plugin.Register(s)
-			if err != nil {
-				klog.Fatalf("Error registering Secret ForceSyncController: %v", err)
-			}
-		}
-		if len(forceSyncConfigmaps) > 0 {
-			if containsStr(registerCtx.Options.Controllers, "-configmaps") {
-				klog.Fatalf("The ConfigMap sync is being used in the configuration, but vcluster ConfigMap syncer is disabled.")
-			}
-			s, err := syncer.CreateForceSyncController(registerCtx, corev1.SchemeGroupVersion.WithKind("ConfigMap"), forceSyncSecrets, nc)
-			if err != nil {
-				klog.Fatalf("Error creating ConfigMap ForceSyncController: %v", err)
-			}
-			err = plugin.Register(s)
-			if err != nil {
-				klog.Fatalf("Error registering ConfigMap ForceSyncController: %v", err)
-			}
-		}
+		// if len(forceSyncSecrets) > 0 {
+		// 	if containsStr(registerCtx.Options.Controllers, "-secrets") {
+		// 		klog.Fatalf("The Secret sync is being used in the configuration, but vcluster Secret syncer is disabled.")
+		// 	}
+		// 	s, err := syncer.CreateForceSyncController(registerCtx, corev1.SchemeGroupVersion.WithKind("Secret"), forceSyncSecrets, nc)
+		// 	if err != nil {
+		// 		klog.Fatalf("Error creating Secret ForceSyncController : %v", err)
+		// 	}
+		// 	err = plugin.Register(s)
+		// 	if err != nil {
+		// 		klog.Fatalf("Error registering Secret ForceSyncController: %v", err)
+		// 	}
+		// }
+		// if len(forceSyncConfigmaps) > 0 {
+		// 	if containsStr(registerCtx.Options.Controllers, "-configmaps") {
+		// 		klog.Fatalf("The ConfigMap sync is being used in the configuration, but vcluster ConfigMap syncer is disabled.")
+		// 	}
+		// 	s, err := syncer.CreateForceSyncController(registerCtx, corev1.SchemeGroupVersion.WithKind("ConfigMap"), forceSyncSecrets, nc)
+		// 	if err != nil {
+		// 		klog.Fatalf("Error creating ConfigMap ForceSyncController: %v", err)
+		// 	}
+		// 	err = plugin.Register(s)
+		// 	if err != nil {
+		// 		klog.Fatalf("Error registering ConfigMap ForceSyncController: %v", err)
+		// 	}
+		// }
 	}
 
 	// start plugin

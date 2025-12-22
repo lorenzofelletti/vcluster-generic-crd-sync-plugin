@@ -2,25 +2,19 @@ package syncer
 
 import (
 	"context"
-	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/namecache"
-	"github.com/loft-sh/vcluster/pkg/syncer"
 	"github.com/loft-sh/vcluster/pkg/syncer/synccontext"
 	syncertypes "github.com/loft-sh/vcluster/pkg/syncer/types"
 	"github.com/loft-sh/vcluster/pkg/util/translate"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const (
@@ -48,7 +42,7 @@ type forceSyncController struct {
 	virtualClient client.Client
 }
 
-var _ syncer.ControllerStarter = &backSyncController{}
+var _ syncertypes.ControllerStarter = &forceSyncController{}
 
 func (f *forceSyncController) Name() string {
 	return f.GVK.Kind + "-force-sync-controller"
@@ -83,8 +77,7 @@ func (f *forceSyncController) Register(ctx *synccontext.RegisterContext) error {
 				return false
 			}
 			return f.shouldSync(object) || containsForceSyncNameAnnotation(object)
-		}))).
-		Watches(f, nil)
+		})))
 	return controller.Complete(f)
 }
 
@@ -98,28 +91,6 @@ func (f *forceSyncController) shouldSync(obj client.Object) bool {
 		}
 	}
 	return false
-}
-
-var _ source.Source = &backSyncController{}
-
-func (f *forceSyncController) Start(ctx context.Context, h handler.EventHandler, q workqueue.RateLimitingInterface, predicates ...predicate.Predicate) error {
-	// setup the necessary name cache hooks
-	for _, c := range f.config {
-		parentGVK := schema.FromAPIVersionAndKind(c.Parent.APIVersion, c.Parent.Kind)
-		f.nameCache.AddChangeHook(parentGVK, namecache.IndexPhysicalToVirtualNamePath, func(name, key, value string) {
-			if name != "" {
-				// value format is HOST_NAME/PATH
-				splitted := strings.Split(key, "/")
-				path := strings.Join(splitted[1:], "/")
-
-				nn := namecache.StringToNamespacedName(value)
-				if path == c.Patch.Path && nn.Name != "" {
-					q.Add(reconcile.Request{NamespacedName: nn})
-				}
-			}
-		})
-	}
-	return nil
 }
 
 func containsForceSyncNameAnnotation(obj client.Object) bool {

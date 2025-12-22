@@ -10,12 +10,12 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/plugin"
 	"github.com/loft-sh/vcluster/pkg/log"
-	"github.com/loft-sh/vcluster/pkg/syncer"
+	"github.com/loft-sh/vcluster/pkg/util/loghelper"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/namecache"
@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -41,7 +40,7 @@ const (
 	MappingsAnnotation = "vcluster.loft.sh/mappings"
 )
 
-func CreateBackSyncer(ctx *synccontext.RegisterContext, config *config.SyncBack, parentConfig *config.FromVirtualCluster, parentNC namecache.NameCache) (syncer.Base, error) {
+func CreateBackSyncer(ctx *synccontext.RegisterContext, config *config.SyncBack, parentConfig *config.FromVirtualCluster, parentNC namecache.NameCache) (syncertypes.Base, error) {
 	if len(config.Selectors) == 0 {
 		return nil, fmt.Errorf("the syncBack config for %s (%s) is missing Selectors", config.Kind, parentConfig.Kind)
 	}
@@ -128,65 +127,54 @@ func (b *backSyncController) resource() client.Object {
 }
 
 func (b *backSyncController) Register(ctx *synccontext.RegisterContext) error {
+	logger := logr.FromContextOrDiscard(ctx)
+
 	maxConcurrentReconciles := 1
 	controller := ctrl.NewControllerManagedBy(ctx.HostManager).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: maxConcurrentReconciles,
 		}).
 		Named(b.Name()).
-		Watches(b.resource(), &handler.Funcs[
-			ctrl.Request,
-			client.Object,
-		]{
-			CreateFunc: func(ctx context.Context, event event.TypedCreateEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[ctrl.Request]) {
-				b.enqueueVirtual(ctx, event.Object, limitingInterface, false)
-			},
-			UpdateFunc: func(ctx context.Context, event event.TypedUpdateEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[ctrl.Request]) {
-				b.enqueueVirtual(ctx, event.ObjectNew, limitingInterface, false)
-			},
-			DeleteFunc: func(ctx context.Context, event event.TypedDeleteEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[ctrl.Request]) {
-				b.enqueueVirtual(ctx, event.Object, limitingInterface, true)
-			},
-			GenericFunc: func(ctx context.Context, event event.TypedGenericEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[ctrl.Request]) {
-				b.enqueueVirtual(ctx, event.Object, limitingInterface, false)
-			},
-		}, source.Kind[client.Object](ctx.VirtualManager.GetCache(), b.resource(), &handler.Funcs[
-			ctrl.Request,
-			client.Object,
-		]{
-			CreateFunc: func(ctx context.Context, event event.TypedCreateEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[ctrl.Request]) {
-			},
-			UpdateFunc: func(ctx context.Context, event event.TypedUpdateEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[ctrl.Request]) {
-			},
-			DeleteFunc: func(ctx context.Context, event event.TypedDeleteEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[ctrl.Request]) {
-				// delete virtual resource
-				virtualName := b.PhysicalToVirtual(types.NamespacedName{
-					Namespace: event.Object.GetNamespace(),
-					Name:      event.Object.GetName(),
-				}, event.Object)
-				if virtualName.String() != "" {
-					vObj := b.resource()
-					err := b.virtualClient.Get(ctx, virtualName, vObj)
-					if err == nil {
-						err = b.deleteVirtualObject(ctx, vObj, b.logger)
-						if err != nil {
-							b.logger.Errorf("error deleting virtual object %s/%s: %v", vObj.GetNamespace(), vObj.GetName(), err)
-						}
+		Watches(b.resource(), handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []ctrl.Request {
+			if obj == nil {
+				return nil
+			}
+			return []ctrl.Request{{
+				NamespacedName: types.NamespacedName{
+					Namespace: obj.GetNamespace(),
+					Name:      obj.GetName(),
+				},
+			}}
+		})).
+		Watches(b.resource(), handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []ctrl.Request {
+			if obj == nil {
+				return nil
+			}
+			// On virtual object deletion, reconcile the corresponding physical object
+			virtualName := b.PhysicalToVirtual(types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				Name:      obj.GetName(),
+			}, obj)
+			if virtualName.String() != "" {
+				vObj := b.resource()
+				err := b.virtualClient.Get(ctx, virtualName, vObj)
+				if err == nil {
+					err = b.deleteVirtualObject(ctx, vObj, b.logger)
+					if err != nil {
+						logger.Error(err, "error deleting virtual object", "namespace", vObj.GetNamespace(), "name", vObj.GetName())
 					}
 				}
-			},
-			GenericFunc: func(ctx context.Context, event event.TypedGenericEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[ctrl.Request]) {
-			},
-		})).
+			}
+			return nil
+		}), builder.OnlyMetadata).
 		For(b.resource())
 	return controller.Complete(b)
 }
 
 func (b *backSyncController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.New(req.Name)
 	syncContext := &synccontext.SyncContext{
 		Context: ctx,
-		Log:     logger,
+		Log:     loghelper.New(req.Name),
 	}
 
 	// get physical resource
@@ -426,7 +414,7 @@ func (b *backSyncController) PhysicalToVirtual(req types.NamespacedName, pObj cl
 
 var _ source.Source = &backSyncController{}
 
-func (b *backSyncController) Start(ctx context.Context, h handler.EventHandler, q workqueue.RateLimitingInterface, predicates ...predicate.Predicate) error {
+func (b *backSyncController) Start(ctx context.Context, q workqueue.TypedRateLimitingInterface[ctrl.Request]) error {
 	// setup the necessary name cache hooks
 	for _, s := range b.config.Selectors {
 		if s.Name != nil {

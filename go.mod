@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	github.com/ghodss/yaml v1.0.0
-	github.com/loft-sh/log v0.0.0-20240219160058-26d83ffb46ac
+	github.com/go-logr/logr v1.4.3
 	github.com/loft-sh/vcluster v0.30.4
 	github.com/loft-sh/vcluster-sdk v0.6.6
 	github.com/pkg/errors v0.9.1
@@ -79,7 +79,6 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
-	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
@@ -122,6 +121,7 @@ require (
 	github.com/loft-sh/analytics-client v0.0.0-20240219162240-2f4c64b2494e // indirect
 	github.com/loft-sh/api/v4 v4.5.0-alpha.10 // indirect
 	github.com/loft-sh/apiserver v0.0.0-20250910060242-4b9f3ffe0646 // indirect
+	github.com/loft-sh/log v0.0.0-20240219160058-26d83ffb46ac // indirect
 	github.com/loft-sh/utils v0.0.29 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

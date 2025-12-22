@@ -21,7 +21,7 @@ type fromVirtualClusterCacheHandler struct {
 	nameCache *nameCache
 }
 
-func (c *fromVirtualClusterCacheHandler) OnAdd(obj interface{}) {
+func (c *fromVirtualClusterCacheHandler) OnAdd(obj interface{}, isInInitialList bool) {
 	unstructuredObj, ok := obj.(*unstructured.Unstructured)
 	if ok {
 		newMappings, err := c.mappingsFromVirtualObject(unstructuredObj, c.mapping)

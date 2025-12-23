@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -14,7 +15,6 @@ import (
 	patchesregex "github.com/loft-sh/vcluster-generic-crd-plugin/pkg/patches/regex"
 	"github.com/loft-sh/vcluster/pkg/util/translate"
 	yaml "gopkg.in/yaml.v3"
-	"gotest.tools/assert"
 )
 
 type patchTestCase struct {
@@ -416,12 +416,12 @@ test2: {}`,
 
 	for _, testCase := range testCases {
 		obj1, err := NewNodeFromString(testCase.obj1)
-		assert.NilError(t, err, "error in node creation in test case %s", testCase.name)
+		assert.NoError(t, err, "error in node creation")
 
 		var obj2 *yaml.Node
 		if testCase.obj2 != "" {
 			obj2, err = NewNodeFromString(testCase.obj2)
-			assert.NilError(t, err, "error in node creation in test case %s", testCase.name)
+			assert.NoError(t, err, "error in node creation")
 		}
 
 		err = applyPatch(obj1, obj2, testCase.patch, testCase.nameResolver)
@@ -429,14 +429,14 @@ test2: {}`,
 			assert.ErrorContains(t, err, testCase.expectedErr.Error())
 			continue
 		} else {
-			assert.NilError(t, err, "error in applying patch in test case %s", testCase.name)
+			assert.NoError(t, err, "error in applying patch")
 		}
 
 		// compare output
 		out, err := yaml.Marshal(obj1)
 
-		assert.NilError(t, err, "error in yaml marshal in test case %s", testCase.name)
-		assert.Equal(t, strings.TrimSpace(string(out)), testCase.expected, "error in comparison in test case %s", testCase.name)
+		assert.NoError(t, err, "error in yaml marshal")
+		assert.Equal(t, testCase.expected, strings.TrimSpace(string(out)))
 	}
 }
 

@@ -50,15 +50,21 @@ func main() {
 		// NOTE(lorenzo): if clusters are short-lived that should not be a problem and we can sync all CRDs at the start only
 		for _, m := range configuration.Mappings {
 			if m.FromVirtualCluster != nil {
-				_, _, err := translate.EnsureCRDFromPhysicalCluster(registerCtx.Context, registerCtx.HostManager.GetConfig(), registerCtx.VirtualManager.GetConfig(), schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind))
-				if err != nil {
-					klog.Fatalf("Error syncronizing CRD %s(%s) from the host cluster into vcluster: %v", m.FromVirtualCluster.Kind, m.FromVirtualCluster.APIVersion, err)
+				gvk := schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind)
+				if !registerCtx.HostManager.GetScheme().Recognizes(gvk) {
+					_, _, err := translate.EnsureCRDFromPhysicalCluster(registerCtx.Context, registerCtx.HostManager.GetConfig(), registerCtx.VirtualManager.GetConfig(), gvk)
+					if err != nil {
+						klog.Fatalf("Error syncronizing CRD %s(%s) from the host cluster into vcluster: %v", m.FromVirtualCluster.Kind, m.FromVirtualCluster.APIVersion, err)
+					}
 				}
 
 				for _, c := range m.FromVirtualCluster.SyncBack {
-					_, _, err := translate.EnsureCRDFromPhysicalCluster(registerCtx.Context, registerCtx.HostManager.GetConfig(), registerCtx.VirtualManager.GetConfig(), schema.FromAPIVersionAndKind(c.APIVersion, c.Kind))
-					if err != nil {
-						klog.Fatalf("Error syncronizing CRD %s(%s) from the host cluster into vcluster: %v", m.FromVirtualCluster.Kind, m.FromVirtualCluster.APIVersion, err)
+					gvk := schema.FromAPIVersionAndKind(c.APIVersion, c.Kind)
+					if !registerCtx.HostManager.GetScheme().Recognizes(gvk) {
+						_, _, err := translate.EnsureCRDFromPhysicalCluster(registerCtx.Context, registerCtx.HostManager.GetConfig(), registerCtx.VirtualManager.GetConfig(), gvk)
+						if err != nil {
+							klog.Fatalf("Error syncronizing CRD %s(%s) from the host cluster into vcluster: %v", m.FromVirtualCluster.Kind, m.FromVirtualCluster.APIVersion, err)
+						}
 					}
 				}
 			}

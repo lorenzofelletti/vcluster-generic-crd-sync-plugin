@@ -146,8 +146,5 @@ func main() {
 	}
 
 	// start plugin
-	err := plugin.Start()
-	if err != nil {
-		klog.Fatalf("Error starting plugin: %v", err)
-	}
+	plugin.MustStart()
 }

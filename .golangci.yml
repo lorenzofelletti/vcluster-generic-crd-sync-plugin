@@ -1,31 +1,36 @@
-run:
-  timeout: 10m
-  skip-dirs:
-  - hack/
-  - docs/
-
+version: "2"
 linters:
-  disable-all:  true
+  default: none
   enable:
-    - deadcode
-    - gosimple
+    - dupl
+    - errcheck
     - govet
     - ineffassign
     - misspell
-    - unused
-    - varcheck
-    - staticcheck
-    - errcheck
-    # - goimports
-    - dupl
     - nakedret
-    - stylecheck
-    # - gofmt
-    # - golint
-    # - structcheck
-  
-linters-settings:
-  gofmt:
-    simplify: true
-  dupl:
-    threshold: 400
+    - staticcheck
+    - unused
+  settings:
+    dupl:
+      threshold: 400
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  settings:
+    gofmt:
+      simplify: true
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

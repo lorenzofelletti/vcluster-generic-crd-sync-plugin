@@ -29,9 +29,10 @@ func ProcessRegex(regex *regexp.Regexp, input string, translateFunc RegexTransla
 	namespacePos := -1
 	groupNames := regex.SubexpNames()
 	for pos, gn := range groupNames {
-		if gn == RegexNameGroup {
+		switch gn {
+		case RegexNameGroup:
 			namePos = pos
-		} else if gn == RegexNamespaceGroup {
+		case RegexNamespaceGroup:
 			namespacePos = pos
 		}
 	}

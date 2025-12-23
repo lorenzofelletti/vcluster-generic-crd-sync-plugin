@@ -78,11 +78,15 @@ func NewNameCache(ctx context.Context, manager ctrl.Manager, mappings *config.Co
 				return nil, fmt.Errorf("get informer for %v: %v", gvk, err)
 			}
 
-			informer.AddEventHandler(&fromVirtualClusterCacheHandler{
+			_, err = informer.AddEventHandler(&fromVirtualClusterCacheHandler{
 				gvk:       gvk,
 				mapping:   mapping.FromVirtualCluster,
 				nameCache: nc,
 			})
+			if err != nil {
+				return nil, fmt.Errorf("add event handler for %v: %w", gvk, err)
+			}
+
 		} else {
 			return nil, fmt.Errorf("currently expects fromVirtualCluster to be defined")
 		}

@@ -23,5 +23,7 @@ FROM alpine
 # Set root path as working directory
 WORKDIR /
 
+RUN mkdir /plugin
+
 # if it does not work, create a /plugin dir and copy to /plugin/plugin
-COPY --from=builder /plugin /plugin
+COPY --from=builder /plugin /plugin/plugin

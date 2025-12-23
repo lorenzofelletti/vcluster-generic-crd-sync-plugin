@@ -14,8 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
 	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/namecache"
@@ -127,46 +127,48 @@ func (b *backSyncController) resource() client.Object {
 }
 
 func (b *backSyncController) Register(ctx *synccontext.RegisterContext) error {
-	logger := logr.FromContextOrDiscard(ctx)
-
 	maxConcurrentReconciles := 1
 	controller := ctrl.NewControllerManagedBy(ctx.HostManager).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: maxConcurrentReconciles,
 		}).
 		Named(b.Name()).
-		Watches(b.resource(), handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []ctrl.Request {
-			if obj == nil {
-				return nil
-			}
-			return []ctrl.Request{{
-				NamespacedName: types.NamespacedName{
-					Namespace: obj.GetNamespace(),
-					Name:      obj.GetName(),
-				},
-			}}
+		WatchesRawSource(source.Kind(ctx.VirtualManager.GetCache(), b.resource(), &handler.Funcs{
+			CreateFunc: func(ctx context.Context, e event.TypedCreateEvent[client.Object], trli workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				b.enqueueVirtual(ctx, e.Object, trli, false)
+			},
+			UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[client.Object], trli workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				b.enqueueVirtual(ctx, e.ObjectNew, trli, false)
+			},
+			DeleteFunc: func(ctx context.Context, e event.TypedDeleteEvent[client.Object], trli workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				b.enqueueVirtual(ctx, e.Object, trli, true)
+			},
+			GenericFunc: func(ctx context.Context, e event.TypedGenericEvent[client.Object], trli workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				b.enqueueVirtual(ctx, e.Object, trli, false)
+			},
 		})).
-		Watches(b.resource(), handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []ctrl.Request {
-			if obj == nil {
-				return nil
-			}
-			// On virtual object deletion, reconcile the corresponding physical object
-			virtualName := b.PhysicalToVirtual(types.NamespacedName{
-				Namespace: obj.GetNamespace(),
-				Name:      obj.GetName(),
-			}, obj)
-			if virtualName.String() != "" {
-				vObj := b.resource()
-				err := b.virtualClient.Get(ctx, virtualName, vObj)
-				if err == nil {
-					err = b.deleteVirtualObject(ctx, vObj, b.logger)
-					if err != nil {
-						logger.Error(err, "error deleting virtual object", "namespace", vObj.GetNamespace(), "name", vObj.GetName())
+		WatchesRawSource(source.Kind(nil, b.resource(), handler.Funcs{
+			DeleteFunc: func(ctx context.Context, event event.TypedDeleteEvent[client.Object], trli workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				// delete virtual resource. Would be nicer to have this part of the controller, but
+				// it works for now.
+				virtualName := b.PhysicalToVirtual(types.NamespacedName{
+					Namespace: event.Object.GetNamespace(),
+					Name:      event.Object.GetName(),
+				}, event.Object)
+				if virtualName.String() != "" {
+					vObj := b.resource()
+					err := b.virtualClient.Get(ctx, virtualName, vObj)
+					if err == nil {
+						err = b.deleteVirtualObject(ctx, vObj, b.logger)
+						if err != nil {
+							logger := logr.FromContextOrDiscard(ctx)
+							logger.Error(err, "error deleting virtual object", "namespace", vObj.GetNamespace(), "name", vObj.GetName())
+						}
 					}
 				}
-			}
-			return nil
-		}), builder.OnlyMetadata).
+			},
+		})).
+		// Watches(b.resource(), nil).
 		For(b.resource())
 	return controller.Complete(b)
 }

@@ -2,7 +2,7 @@ version: v2beta1
 name: generic-crd-plugin
 
 vars:
-  PLUGIN_IMAGE: ghcr.io/loft-sh/vcluster-generic-crd-plugin
+  PLUGIN_IMAGE: localhost:5001/gensync:latest
   DEVSPACE_FLAGS: "-n vcluster"
 
 images:
@@ -18,38 +18,38 @@ deployments:
         name: vcluster
         repo: https://charts.loft.sh
       valuesFiles:
-        - plugin.yaml
+      - plugin.yaml
       values:
         sync:
           nodes:
             enabled: true
             syncAllNodes: true
             enableScheduler: true
-        plugin:
+        plugins:
           generic-crd-plugin:
             image: ${PLUGIN_IMAGE}
             rbac:
               role:
                 extraRules:
-                  # Config for testing
-                  - apiGroups: ["cert-manager.io"]
-                    resources: ["issuers", "certificates", "certificaterequests"]
-                    verbs: ["create", "delete", "patch", "update", "get", "list", "watch"]
-                  - apiGroups: ["monitoring.coreos.com"]
-                    resources: ["servicemonitors"]
-                    verbs: ["create", "delete", "patch", "update", "get", "list", "watch"]
+                # Config for testing
+                - apiGroups: [ "cert-manager.io" ]
+                  resources: [ "issuers", "certificates", "certificaterequests" ]
+                  verbs: [ "create", "delete", "patch", "update", "get", "list", "watch" ]
+                - apiGroups: [ "monitoring.coreos.com" ]
+                  resources: [ "servicemonitors" ]
+                  verbs: [ "create", "delete", "patch", "update", "get", "list", "watch" ]
             env:
-              # Config for testing
-              # run `make install-cert-manager` within the host kube context before using
-              # Then in vcluster context create hack/selfsigned-issuer.yaml
-              # and hack/generate-dummy-certificate.yaml
-              #
-              # For convenience export config inside the dev container from the hack/test-config.yaml
-              # export CONFIG=$(cat hack/test-config.yaml)
-              - name: CONFIG
-                value: |-
-                  version: v1beta1
-                  mappings: []
+            # Config for testing
+            # run `make install-cert-manager` within the host kube context before using
+            # Then in vcluster context create hack/selfsigned-issuer.yaml
+            # and hack/generate-dummy-certificate.yaml
+            #
+            # For convenience export config inside the dev container from the hack/test-config.yaml
+            # export CONFIG=$(cat hack/test-config.yaml)
+            - name: CONFIG
+              value: |-
+                version: v1beta1
+                mappings: []
         syncer:
           readinessProbe:
             enabled: false
@@ -57,7 +57,7 @@ deployments:
             enabled: false
         vcluster:
           extraArgs:
-            - "--kube-apiserver-arg='v=6'"
+          - "--kube-apiserver-arg='v=6'"
 
 dev:
   vcluster:

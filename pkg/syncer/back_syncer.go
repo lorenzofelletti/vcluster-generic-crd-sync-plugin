@@ -470,10 +470,14 @@ func (b *backSyncController) removeAnnotationsFromPhysicalObject(ctx *synccontex
 }
 
 func (b *backSyncController) addAnnotationsToPhysicalObject(ctx *synccontext.SyncContext, pObj client.Object, vObj types.NamespacedName, mappings map[string]string) error {
+	ctx.Log.Debugf("Adding annotations to physical object. Virtual Name: %s, Virtual Namespace: %s, Mappings: %+v", vObj.Name, vObj.Namespace, mappings)
+	ctx.Log.Debugf("Physical Object: %+v", pObj)
+	ctx.Log.Debugf("Virtual Object: %+v", vObj)
+
 	originalObject := pObj.DeepCopyObject().(client.Object)
 	annotations := pObj.GetAnnotations()
 	if annotations == nil {
-		annotations = map[string]string{}
+		annotations = make(map[string]string)
 	}
 	annotations[translate.MarkerLabel] = translate.VClusterName
 	annotations[translate.NameAnnotation] = vObj.Name

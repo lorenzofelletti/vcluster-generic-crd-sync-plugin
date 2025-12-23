@@ -1,0 +1,18 @@
+===========================================================================
+==  NOTICE file corresponding to section 4(d) of the Apache License,     ==
+==  Version 2.0, in this case for the vcluster-generic-crd-sync-plugin.  ==
+===========================================================================
+
+vcluster-generic-crd-sync-plugin
+Copyright 2025 Lorenzo Felletti
+
+This product includes software developed at
+vcluster-generic-crd-sync-plugin (https://github.com/loft-sh/vcluster-generic-crd-sync-plugin).
+
+Portions of this software were originally written by Loft Labs, Inc.
+and are Copyright by the original authors.
+
+MODIFICATIONS:
+The changes made to this fork since e9fdc3966463bd1b70f1edb69721492576114aa8 are 
+Copyright 2025 Lorenzo Felletti and are licensed under the Apache 
+License, Version 2.0.

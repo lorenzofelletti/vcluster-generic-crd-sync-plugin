@@ -1,3 +1,5 @@
+// Modified by Lorenzo Felletti (2025) under Apache 2.0.
+// Original code from vcluster-generic-crd-sync-plugin by Loft Labs.
 package main
 
 import (

@@ -6,10 +6,10 @@ package namecache
 import (
 	"fmt"
 
-	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
-	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/patches"
-	patchesregex "github.com/loft-sh/vcluster-generic-crd-plugin/pkg/patches/regex"
 	"github.com/loft-sh/vcluster/pkg/util/translate"
+	"github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/config"
+	"github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/patches"
+	patchesregex "github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/patches/regex"
 	"github.com/pkg/errors"
 	"github.com/vmware-labs/yaml-jsonpath/pkg/yamlpath"
 	"gopkg.in/yaml.v3"

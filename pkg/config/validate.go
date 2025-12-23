@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/util/yaml"
+	"github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/util/yaml"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )

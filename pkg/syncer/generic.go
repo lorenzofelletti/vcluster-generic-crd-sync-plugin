@@ -8,8 +8,8 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
-	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/patches"
+	"github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/config"
+	"github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/patches"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

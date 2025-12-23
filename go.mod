@@ -1,4 +1,4 @@
-module github.com/loft-sh/vcluster-generic-crd-plugin
+module github.com/lorenzofelletti/vcluster-generic-crd-plugin
 
 go 1.25.0
 

@@ -16,24 +16,24 @@ import (
 )
 
 const (
-	ConfigurationEnvVar    = "CONFIG"
-	NewConfigurationEnvVar = "PLUGIN_CONFIG"
+	configurationEnvVar    = "CONFIG"
+	newConfigurationEnvVar = "PLUGIN_CONFIG"
 )
 
 func main() {
 	// init plugin
 	registerCtx := plugin.MustInit()
 
-	c := os.Getenv(NewConfigurationEnvVar)
+	c := os.Getenv(newConfigurationEnvVar)
 	if c == "" {
-		klog.Warningf("The %s environment variable is empty, no configuration has been loaded", NewConfigurationEnvVar)
-		klog.Warningf("Falling back to the deprecated %s environment variable", ConfigurationEnvVar)
-		c = os.Getenv(ConfigurationEnvVar)
+		klog.Warningf("The %s environment variable is empty, no configuration has been loaded", newConfigurationEnvVar)
+		klog.Warningf("Falling back to the deprecated %s environment variable", configurationEnvVar)
+		c = os.Getenv(configurationEnvVar)
 	}
 
 	if c == "" {
 		// still empty
-		klog.Warningf("The %s environment variable is also empty, no configuration has been loaded", ConfigurationEnvVar)
+		klog.Warningf("The %s environment variable is also empty, no configuration has been loaded", configurationEnvVar)
 	} else {
 		klog.Infof("Loading configuration:\n%s", c) //dev
 		configuration, err := config.ParseConfig(c)
@@ -50,20 +50,16 @@ func main() {
 		// NOTE(lorenzo): if clusters are short-lived that should not be a problem and we can sync all CRDs at the start only
 		for _, m := range configuration.Mappings {
 			if m.FromVirtualCluster != nil {
-				// if !plugin.Scheme.Recognizes(schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind)) {
 				_, _, err := translate.EnsureCRDFromPhysicalCluster(registerCtx.Context, registerCtx.HostManager.GetConfig(), registerCtx.VirtualManager.GetConfig(), schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind))
 				if err != nil {
 					klog.Fatalf("Error syncronizing CRD %s(%s) from the host cluster into vcluster: %v", m.FromVirtualCluster.Kind, m.FromVirtualCluster.APIVersion, err)
 				}
-				// }
 
 				for _, c := range m.FromVirtualCluster.SyncBack {
-					// if !plugin.Scheme.Recognizes(schema.FromAPIVersionAndKind(m.FromVirtualCluster.APIVersion, m.FromVirtualCluster.Kind)) {
 					_, _, err := translate.EnsureCRDFromPhysicalCluster(registerCtx.Context, registerCtx.HostManager.GetConfig(), registerCtx.VirtualManager.GetConfig(), schema.FromAPIVersionAndKind(c.APIVersion, c.Kind))
 					if err != nil {
 						klog.Fatalf("Error syncronizing CRD %s(%s) from the host cluster into vcluster: %v", m.FromVirtualCluster.Kind, m.FromVirtualCluster.APIVersion, err)
 					}
-					// }
 				}
 			}
 		}

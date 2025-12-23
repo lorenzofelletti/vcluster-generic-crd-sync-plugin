@@ -3,12 +3,14 @@ package yaml
 import (
 	"bytes"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
+// UnmarshalStrict unmarshals the given data into out and errors on unknown fields
 func UnmarshalStrict(data []byte, out interface{}) error {
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	decoder.KnownFields(true)

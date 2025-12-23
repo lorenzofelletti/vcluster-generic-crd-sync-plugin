@@ -1,9 +1,3 @@
-# Deprecation Notice
-> [!IMPORTANT]  
-> This repository is no longer maintained. 
-> 
-> The generic CRD plugin functionality has moved to the vCluster settings: [fromHost.customResources](https://www.vcluster.com/docs/vcluster/configure/vcluster-yaml/sync/from-host/custom-resources) / [toHost.customResources](https://www.vcluster.com/docs/vcluster/configure/vcluster-yaml/sync/to-host/advanced/custom-resources)
-
 # Generic CRD Sync Plugin
 
 This plugin allows reusing host cluster CRDs inside a vcluster. The plugin synchronizes the host cluster CRD into the virtual cluster and syncs created objects within the vcluster back to the host cluster. 
@@ -23,3 +17,5 @@ These ones are currently available:
 
 **Note:** The configurations mentioned above are provided without any commercial support.  
 **Note:** The configurations mentioned above are covering only subsets of features of a given project.
+
+**Note:** This repo is a fork of [loft-sh/vcluster-generic-crd-sync-plugin](https://github.com/loft-sh/vcluster-generic-crd-sync-plugin).

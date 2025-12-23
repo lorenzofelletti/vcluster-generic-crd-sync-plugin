@@ -6,8 +6,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
-	yamlhelper "github.com/loft-sh/vcluster-generic-crd-plugin/pkg/util/yaml"
+	"github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/config"
+	yamlhelper "github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/util/yaml"
 	"github.com/pkg/errors"
 	yaml "gopkg.in/yaml.v3"
 	k8syaml "sigs.k8s.io/yaml"

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
+	"github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/config"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"

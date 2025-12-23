@@ -7,11 +7,11 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
-	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/namecache"
-	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/syncer"
 	"github.com/loft-sh/vcluster-sdk/plugin"
 	"github.com/loft-sh/vcluster/pkg/util/translate"
+	"github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/config"
+	"github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/namecache"
+	"github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/syncer"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog"

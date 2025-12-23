@@ -11,9 +11,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
-	patchesregex "github.com/loft-sh/vcluster-generic-crd-plugin/pkg/patches/regex"
 	"github.com/loft-sh/vcluster/pkg/util/translate"
+	"github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/config"
+	patchesregex "github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/patches/regex"
 	yaml "gopkg.in/yaml.v3"
 )
 

@@ -7,11 +7,11 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/config"
-	"github.com/loft-sh/vcluster-generic-crd-plugin/pkg/namecache"
 	"github.com/loft-sh/vcluster/pkg/syncer/synccontext"
 	syncertypes "github.com/loft-sh/vcluster/pkg/syncer/types"
 	"github.com/loft-sh/vcluster/pkg/util/translate"
+	"github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/config"
+	"github.com/lorenzofelletti/vcluster-generic-crd-plugin/pkg/namecache"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"

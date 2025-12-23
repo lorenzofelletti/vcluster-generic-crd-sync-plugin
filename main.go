@@ -16,18 +16,24 @@ import (
 )
 
 const (
-	ConfigurationEnvVar = "CONFIG"
+	ConfigurationEnvVar    = "CONFIG"
+	NewConfigurationEnvVar = "PLUGIN_CONFIG"
 )
 
 func main() {
 	// init plugin
-	registerCtx := plugin.MustInitWithOptions(plugin.Options{
-		// NewClient: blockingcacheclient.NewCacheClient,
-	})
+	registerCtx := plugin.MustInit()
 
-	c := os.Getenv(ConfigurationEnvVar)
+	c := os.Getenv(NewConfigurationEnvVar)
 	if c == "" {
-		klog.Warningf("The %s environment variable is empty, no configuration has been loaded", ConfigurationEnvVar)
+		klog.Warningf("The %s environment variable is empty, no configuration has been loaded", NewConfigurationEnvVar)
+		klog.Warningf("Falling back to the deprecated %s environment variable", ConfigurationEnvVar)
+		c = os.Getenv(ConfigurationEnvVar)
+	}
+
+	if c == "" {
+		// still empty
+		klog.Warningf("The %s environment variable is also empty, no configuration has been loaded", ConfigurationEnvVar)
 	} else {
 		klog.Infof("Loading configuration:\n%s", c) //dev
 		configuration, err := config.ParseConfig(c)
@@ -140,13 +146,4 @@ func main() {
 	if err != nil {
 		klog.Fatalf("Error starting plugin: %v", err)
 	}
-}
-
-func containsStr(arr []string, s string) bool {
-	for _, item := range arr {
-		if item == s {
-			return true
-		}
-	}
-	return false
 }
